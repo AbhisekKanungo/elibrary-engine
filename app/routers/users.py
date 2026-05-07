@@ -5,9 +5,9 @@ from app.models import User
 from app.schemas import UserCreate, UserResponse
 from typing import List
 
-router = APIRouter()
+router = APIRouter(prefix="/users", tags=["Users"])
 
-@router.post("/", response_model=UserResponse)
+@router.post("/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user.email).first()
     if existing:
