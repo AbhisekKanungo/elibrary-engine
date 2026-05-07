@@ -1,7 +1,14 @@
 from fastapi import FastAPI
+from app.database import engine, Base
 
-app = FastAPI(title="E-Library Engine")
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="E-Library Engine",
+    description="High-Concurrency Digital Library System",
+    version="1.0.0"
+)
 
 @app.get("/")
 def root():
-    return {"status": "Engine online, running purely on raw SQL database constraints!"}
+    return {"message": "E-Library Engine is running"}
