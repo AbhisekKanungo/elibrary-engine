@@ -5,7 +5,9 @@ from app.database import get_db
 from app.models import Book
 from app.schemas import BookCreate, BookResponse
 from typing import List, Optional
-
+from app.cache import book_cache
+import logging
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/", response_model=BookResponse)
@@ -41,11 +43,36 @@ def search_books(
 def get_all_books(skip: int = 0, limit: int = 50, db: Session = Depends(get_db)):
     return db.query(Book).offset(skip).limit(limit).all()
 
+@router.get("/cache/stats")
+def cache_stats():
+    return book_cache.stats()
+
 @router.get("/{book_id}", response_model=BookResponse)
 def get_book(book_id: int, db: Session = Depends(get_db)):
+    cache_key = f"book:{book_id}"
+
+    cached = book_cache.get(cache_key)
+    if cached:
+        logger.info(f"[CACHE HIT] book_id={book_id}")
+        return cached
+
+    logger.info(f"[CACHE MISS] book_id={book_id} — querying DB")
     book = db.query(Book).filter(Book.book_id == book_id).first()
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
+
+    book_dict = {
+        "book_id":            book.book_id,
+        "title":              book.title,
+        "author":             book.author,
+        "isbn":               book.isbn,
+        "category":           book.category,
+        "total_licenses":     book.total_licenses,
+        "available_licenses": book.available_licenses,
+        "description":        book.description,
+        "cover_url":          book.cover_url
+    }
+    book_cache.set(cache_key, book_dict)
     return book
 
 @router.put("/{book_id}", response_model=BookResponse)
