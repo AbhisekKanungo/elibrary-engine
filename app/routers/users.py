@@ -5,7 +5,7 @@ from app.models import User
 from app.schemas import UserCreate, UserResponse
 from typing import List
 
-router = APIRouter(prefix="/users", tags=["Users"])
+router = APIRouter()
 
 @router.post("/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):

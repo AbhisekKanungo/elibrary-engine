@@ -6,9 +6,9 @@ from app.models import Book
 from app.schemas import BookCreate, BookResponse
 from typing import List, Optional
 
-router = APIRouter(prefix="/books", tags=["Books"])
+router = APIRouter()
 
-@router.post("/")
+@router.post("/", response_model=BookResponse)
 def create_book(book: BookCreate, db: Session = Depends(get_db)):
     db_book = Book(**book.dict())
     db.add(db_book)
