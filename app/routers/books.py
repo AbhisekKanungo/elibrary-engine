@@ -6,6 +6,7 @@ from app.models import Book
 from app.schemas import BookCreate, BookResponse
 from typing import List, Optional
 from app.cache import book_cache
+from app.recommendations import get_recommendations_bfs
 import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,6 +48,20 @@ def get_all_books(skip: int = 0, limit: int = 50, db: Session = Depends(get_db))
 def cache_stats():
     return book_cache.stats()
 
+@router.get("/recommendations/{user_id}")
+def get_recommendations(user_id: int, db: Session = Depends(get_db)):
+    """
+    Graph-based recommendations using BFS on
+    a bipartite user-book graph (Discrete Maths).
+    """
+    recs = get_recommendations_bfs(user_id, db)
+    if not recs:
+        return {
+            "user_id": user_id,
+            "message": "No recommendations yet. Borrow some books first!",
+            "recommendations": []
+        }
+    return {"user_id": user_id, "recommendations": recs}
 @router.get("/{book_id}", response_model=BookResponse)
 def get_book(book_id: int, db: Session = Depends(get_db)):
     cache_key = f"book:{book_id}"
