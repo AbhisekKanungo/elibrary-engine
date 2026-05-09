@@ -7,7 +7,7 @@ from typing import List
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user.email).first()
     if existing:

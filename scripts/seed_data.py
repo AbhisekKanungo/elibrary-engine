@@ -8,7 +8,6 @@ import os
 
 load_dotenv()
 fake = Faker()
-
 conn   = psycopg2.connect(os.getenv("DATABASE_URL"))
 cursor = conn.cursor()
 
