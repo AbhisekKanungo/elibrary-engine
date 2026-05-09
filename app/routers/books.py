@@ -7,6 +7,8 @@ from app.schemas import BookCreate, BookResponse
 from typing import List, Optional
 from app.cache import book_cache
 from app.recommendations import get_recommendations_bfs
+from fastapi.responses import StreamingResponse
+import os
 import logging
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -109,3 +111,63 @@ def delete_book(book_id: int, db: Session = Depends(get_db)):
     db.delete(book)
     db.commit()
     return {"message": "Book deleted"}
+
+@router.get("/{book_id}/stream/info")
+def stream_info(book_id: int, db: Session = Depends(get_db)):
+    book = db.query(Book).filter(Book.book_id == book_id).first()
+    if not book or not book.content:
+        raise HTTPException(status_code=404, detail="No file linked to this book")
+    
+    path = book.content.file_path
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    # Auto-detect size from disk — no manual input needed
+    actual_size = os.path.getsize(path)
+    
+    # Update DB with real size automatically
+    book.content.file_size_bytes = actual_size
+    db.commit()
+    
+    return {
+        "book_id":          book_id,
+        "title":            book.title,
+        "file_size_bytes":  actual_size,
+        "chunk_size_bytes": 4096,
+        "total_chunks":     (actual_size // 4096) + 1
+    }
+
+@router.get("/{book_id}/stream")
+def stream_book(book_id: int, db: Session = Depends(get_db)):
+    """
+    OS Concept: Chunked Transfer / Buffer Pool.
+    Reads PDF in 4KB chunks — full file never
+    loads into RAM. Prevents memory exhaustion
+    under concurrent users.
+    """
+    book = db.query(Book).filter(Book.book_id == book_id).first()
+    if not book or not book.content:
+        raise HTTPException(status_code=404, detail="No file linked to this book")
+
+    path = book.content.file_path
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    def chunked_iterator(file_path: str, chunk_size: int = 4096):
+        chunk_num = 0
+        with open(file_path, "rb") as f:
+            while True:
+                chunk = f.read(chunk_size)
+                if not chunk:
+                    break
+                chunk_num += 1
+                logger.info(f"[STREAM] book_id={book_id} chunk={chunk_num} bytes={len(chunk)}")
+                yield chunk
+
+    return StreamingResponse(
+        chunked_iterator(path),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename={book.title}.pdf"
+        }
+    )
