@@ -5,7 +5,7 @@ from app.models import Book, User, Transaction, TransactionStatus
 from app.schemas import BorrowRequest, TransactionResponse
 from datetime import datetime, timedelta
 from typing import List
-
+from sqlalchemy import func
 router = APIRouter()
 
 @router.post("/borrow", response_model=TransactionResponse)
@@ -76,3 +76,55 @@ def get_user_transactions(user_id: int, db: Session = Depends(get_db)):
     return db.query(Transaction).filter(
         Transaction.user_id == user_id
     ).all()
+
+@router.get("/overdue")
+def get_overdue(db: Session = Depends(get_db)):
+    now     = datetime.utcnow()
+    overdue = db.query(Transaction).filter(
+        Transaction.status   == TransactionStatus.active,
+        Transaction.due_date <  now
+    ).all()
+    for t in overdue:
+        t.status = TransactionStatus.overdue
+    db.commit()
+    return {
+        "overdue_count": len(overdue),
+        "transactions": [
+            {
+                "transaction_id": t.transaction_id,
+                "user_id":        t.user_id,
+                "book_id":        t.book_id,
+                "due_date":       t.due_date,
+                "days_overdue":   (now - t.due_date).days
+            }
+            for t in overdue
+        ]
+    }
+
+@router.get("/dashboard/stats")
+def dashboard_stats(db: Session = Depends(get_db)):
+    from app.cache import book_cache
+
+    total_books    = db.query(Book).count()
+    total_users    = db.query(User).count()
+    active_borrows = db.query(Transaction).filter(
+        Transaction.status == TransactionStatus.active
+    ).count()
+
+    popular = db.query(
+        Book.title,
+        func.count(Transaction.transaction_id).label("cnt")
+    ).join(Transaction)\
+     .group_by(Book.book_id)\
+     .order_by(func.count(Transaction.transaction_id).desc())\
+     .limit(5).all()
+
+    return {
+        "total_books":    total_books,
+        "total_users":    total_users,
+        "active_borrows": active_borrows,
+        "cache_stats":    book_cache.stats(),
+        "popular_books":  [
+            {"title": t, "borrow_count": c} for t, c in popular
+        ]
+    }
