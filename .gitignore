@@ -5,4 +5,4 @@ __pycache__/
 *.pyo
 book_files/
 .DS_Store
-postgres_data/
+postgres_data/.env
