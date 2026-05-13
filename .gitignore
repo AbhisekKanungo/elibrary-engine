@@ -7,3 +7,4 @@ book_files/
 .DS_Store
 postgres_data/.env
 .DS_Store
+frontend/node_modules/
