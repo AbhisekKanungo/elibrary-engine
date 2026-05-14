@@ -6,23 +6,25 @@ from app.schemas import BorrowRequest, TransactionResponse
 from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy import func
+from app.auth import get_current_user
+from app.models import User
 router = APIRouter()
 
 @router.post("/borrow", response_model=TransactionResponse)
-def borrow_book(request: BorrowRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.user_id == request.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+def borrow_book(
+    request: BorrowRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Replace request.user_id with current_user.user_id
     existing = db.query(Transaction).filter(
-        Transaction.user_id == request.user_id,
+        Transaction.user_id == current_user.user_id,
         Transaction.book_id == request.book_id,
         Transaction.status  == TransactionStatus.active
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="You already have this book borrowed")
-
-    # PESSIMISTIC LOCK — this row is locked until we commit
+    #PESSIMISTIC LOCKING
     book = db.query(Book).filter(
         Book.book_id == request.book_id
     ).with_for_update().first()
@@ -30,11 +32,11 @@ def borrow_book(request: BorrowRequest, db: Session = Depends(get_db)):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     if book.available_licenses <= 0:
-        raise HTTPException(status_code=409, detail=f"No licenses available. All {book.total_licenses} copies are borrowed.")
+        raise HTTPException(status_code=409, detail=f"No licenses available.")
 
     book.available_licenses -= 1
     transaction = Transaction(
-        user_id     = request.user_id,
+        user_id     = current_user.user_id,
         book_id     = request.book_id,
         borrow_date = datetime.utcnow(),
         due_date    = datetime.utcnow() + timedelta(days=14),

@@ -20,6 +20,7 @@ class User(Base):
     name       = Column(String(100), nullable=False)
     email      = Column(String(100), unique=True, nullable=False)
     user_type  = Column(Enum(UserType), default=UserType.student)
+    password_hash = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     transactions = relationship("Transaction", back_populates="user")
 

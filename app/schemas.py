@@ -49,7 +49,6 @@ class BookResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class BorrowRequest(BaseModel):
-    user_id: int
     book_id: int
 
 class TransactionResponse(BaseModel):
