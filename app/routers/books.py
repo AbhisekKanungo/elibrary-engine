@@ -54,7 +54,7 @@ def cache_stats():
 def get_recommendations(user_id: int, db: Session = Depends(get_db)):
     """
     Graph-based recommendations using BFS on
-    a bipartite user-book graph (Discrete Maths).
+    a bipartite user-book graph.
     """
     recs = get_recommendations_bfs(user_id, db)
     if not recs:
@@ -140,7 +140,7 @@ def stream_info(book_id: int, db: Session = Depends(get_db)):
 @router.get("/{book_id}/stream")
 def stream_book(book_id: int, db: Session = Depends(get_db)):
     """
-    OS Concept: Chunked Transfer / Buffer Pool.
+    Chunked Transfer / Buffer Pool.
     Reads PDF in 4KB chunks — full file never
     loads into RAM. Prevents memory exhaustion
     under concurrent users.

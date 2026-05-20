@@ -75,9 +75,40 @@ def get_active(db: Session = Depends(get_db)):
 
 @router.get("/user/{user_id}", response_model=List[TransactionResponse])
 def get_user_transactions(user_id: int, db: Session = Depends(get_db)):
-    return db.query(Transaction).filter(
+    transactions = db.query(Transaction).filter(
         Transaction.user_id == user_id
     ).all()
+    return transactions
+
+@router.get("/user/{user_id}/fines")
+def get_user_fines(user_id: int, db: Session = Depends(get_db)):
+    now = datetime.utcnow()
+    active = db.query(Transaction).filter(
+        Transaction.user_id == user_id,
+        Transaction.status  == TransactionStatus.active,
+        Transaction.due_date < now
+    ).all()
+
+    total_fine = 0
+    fines = []
+    for t in active:
+        days_overdue = (now - t.due_date).days
+        fine = days_overdue * 1  # ₹1 per day
+        total_fine += fine
+        fines.append({
+            "transaction_id": t.transaction_id,
+            "book_id":        t.book_id,
+            "due_date":       t.due_date,
+            "days_overdue":   days_overdue,
+            "fine_amount":    fine
+        })
+
+    return {
+        "user_id":    user_id,
+        "total_fine": total_fine,
+        "currency":   "INR",
+        "details":    fines
+    }
 
 @router.get("/overdue")
 def get_overdue(db: Session = Depends(get_db)):
